@@ -10,11 +10,14 @@
 namespace dis {
 
 struct SideConfig {
-    std::string address;           // multicast group address
-    uint16_t    port = 3000;       // send/receive port
+    std::string address;               // multicast group address
+    uint16_t    send_port = 3000;      // port used for sending
+    uint16_t    receive_port = 3000;   // port used for receiving
     std::string interface = "0.0.0.0";
-    uint16_t    receive_only_port = 0;  // optional additional receive-only port (0 = disabled)
     int         ttl = 32;
+
+    // True when send and receive use the same port (single socket mode)
+    bool single_port() const { return send_port == receive_port; }
 };
 
 struct GatewayConfig {
@@ -60,10 +63,10 @@ private:
     void dump_stats() const;
 
     GatewayConfig config_;
-    MulticastSocket sock_a_;
-    MulticastSocket sock_a_recv_;  // optional receive-only socket for side A
-    MulticastSocket sock_b_;
-    MulticastSocket sock_b_recv_;  // optional receive-only socket for side B
+    MulticastSocket sock_a_send_;   // side A send socket (bound to send_port)
+    MulticastSocket sock_a_recv_;   // side A recv socket (bound to receive_port; unused in single-port mode)
+    MulticastSocket sock_b_send_;   // side B send socket (bound to send_port)
+    MulticastSocket sock_b_recv_;   // side B recv socket (bound to receive_port; unused in single-port mode)
     std::atomic<bool> running_{false};
     Stats stats_;
 };

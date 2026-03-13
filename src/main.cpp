@@ -73,19 +73,18 @@ int main(int argc, char* argv[]) {
     }
 
     std::printf("DIS Translation Gateway\n");
-    std::printf("  Side A: %s:%u (iface %s)",
-                config.side_a.address.c_str(), config.side_a.port,
-                config.side_a.interface.c_str());
-    if (config.side_a.receive_only_port > 0)
-        std::printf(" recv-only:%u", config.side_a.receive_only_port);
-    std::printf("\n");
-
-    std::printf("  Side B: %s:%u (iface %s)",
-                config.side_b.address.c_str(), config.side_b.port,
-                config.side_b.interface.c_str());
-    if (config.side_b.receive_only_port > 0)
-        std::printf(" recv-only:%u", config.side_b.receive_only_port);
-    std::printf("\n");
+    auto print_side = [](const char* label, const dis::SideConfig& sc) {
+        if (sc.single_port()) {
+            std::printf("  %s: %s:%u (single port, iface %s)\n",
+                        label, sc.address.c_str(), sc.send_port, sc.interface.c_str());
+        } else {
+            std::printf("  %s: %s send:%u recv:%u (dual port, iface %s)\n",
+                        label, sc.address.c_str(), sc.send_port, sc.receive_port,
+                        sc.interface.c_str());
+        }
+    };
+    print_side("Side A", config.side_a);
+    print_side("Side B", config.side_b);
 
     std::printf("  Rules: %zu A->B, %zu B->A\n",
                 config.rules_a_to_b.size(), config.rules_b_to_a.size());

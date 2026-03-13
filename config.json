@@ -4,18 +4,18 @@
     "side_a": {
         "_comment": "Your local DIS application",
         "address": "239.1.2.3",
-        "port": 3000,
+        "send_port": 3000,
+        "receive_port": 3000,
         "interface": "0.0.0.0",
-        "receive_only_port": 0,
         "ttl": 32
     },
 
     "side_b": {
         "_comment": "The other side (remote DIS application)",
         "address": "239.1.2.4",
-        "port": 3000,
+        "send_port": 3000,
+        "receive_port": 3000,
         "interface": "0.0.0.0",
-        "receive_only_port": 0,
         "ttl": 32
     },
 
