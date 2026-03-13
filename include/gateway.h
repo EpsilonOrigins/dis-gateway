@@ -45,13 +45,16 @@ struct Stats {
 
 class Gateway {
 public:
-    explicit Gateway(GatewayConfig config);
+    Gateway(GatewayConfig config, std::string config_path);
 
     // Run the gateway event loop (blocks until stop() is called)
     void run();
 
     // Signal the gateway to stop
     void stop();
+
+    // Request a rule reload on the next loop iteration (safe to call from signal handlers)
+    void request_reload();
 
 private:
     void handle_pdu(const uint8_t* buf, size_t len,
@@ -62,16 +65,28 @@ private:
 
     void dump_stats() const;
 
+    // Re-read rules (and non-network settings) from the config file in place.
+    // Called from the main loop; sockets are not affected.
+    void reload_rules();
+
     GatewayConfig config_;
+    std::string   config_path_;     // path to config file, used for hot-reload
     MulticastSocket sock_a_send_;   // side A send socket (bound to send_port)
     MulticastSocket sock_a_recv_;   // side A recv socket (bound to receive_port; unused in single-port mode)
     MulticastSocket sock_b_send_;   // side B send socket (bound to send_port)
     MulticastSocket sock_b_recv_;   // side B recv socket (bound to receive_port; unused in single-port mode)
     std::atomic<bool> running_{false};
+    std::atomic<bool> reload_pending_{false};
+    int inotify_fd_ = -1;   // inotify instance fd (-1 if unavailable)
+    int inotify_wd_ = -1;   // watch descriptor for config file's directory
     Stats stats_;
 };
 
-// Parse GatewayConfig from JSON
+// Parse a full GatewayConfig from JSON
 GatewayConfig parse_config(const nlohmann::json& j);
+
+// Parse only the rule arrays and non-network settings from JSON into an existing config.
+// Side network parameters (address, ports, interface, ttl) are left unchanged.
+void parse_rules_into(const nlohmann::json& j, GatewayConfig& cfg);
 
 } // namespace dis
