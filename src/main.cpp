@@ -12,6 +12,10 @@ static void signal_handler(int /*sig*/) {
     if (g_gateway) g_gateway->stop();
 }
 
+static void reload_signal_handler(int /*sig*/) {
+    if (g_gateway) g_gateway->request_reload();
+}
+
 static void print_usage(const char* prog) {
     std::printf("Usage: %s <config.json> [--dry-run]\n", prog);
     std::printf("\nDIS Translation Gateway\n");
@@ -98,11 +102,12 @@ int main(int argc, char* argv[]) {
     dis::init_field_registry();
 
     // Set up signal handlers
-    std::signal(SIGINT, signal_handler);
+    std::signal(SIGINT,  signal_handler);
     std::signal(SIGTERM, signal_handler);
+    std::signal(SIGUSR1, reload_signal_handler);
 
     // Run gateway
-    dis::Gateway gw(std::move(config));
+    dis::Gateway gw(std::move(config), config_path);
     g_gateway = &gw;
     gw.run();
     g_gateway = nullptr;
