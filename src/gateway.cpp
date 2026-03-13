@@ -17,15 +17,8 @@ GatewayConfig parse_config(const nlohmann::json& j) {
         sc.interface = s.value("interface", "0.0.0.0");
         sc.ttl       = s.value("ttl", 32);
 
-        // Port configuration: either "port" (single) or "send_port"/"receive_port" (dual)
-        if (s.contains("send_port") || s.contains("receive_port")) {
-            sc.send_port    = s.at("send_port").get<uint16_t>();
-            sc.receive_port = s.at("receive_port").get<uint16_t>();
-        } else {
-            uint16_t port   = s.at("port").get<uint16_t>();
-            sc.send_port    = port;
-            sc.receive_port = port;
-        }
+        sc.send_port    = s.at("send_port").get<uint16_t>();
+        sc.receive_port = s.at("receive_port").get<uint16_t>();
         return sc;
     };
 
