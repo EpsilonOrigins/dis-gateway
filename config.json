@@ -2,20 +2,18 @@
     "_comment": "DIS Translation Gateway Configuration",
 
     "side_a": {
-        "_comment": "Your local DIS application",
+        "_comment": "Your local DIS application. Use 'port' for single-port mode, or 'send_port'/'receive_port' for dual-port mode.",
         "address": "239.1.2.3",
         "port": 3000,
         "interface": "0.0.0.0",
-        "receive_only_port": 0,
         "ttl": 32
     },
 
     "side_b": {
-        "_comment": "The other side (remote DIS application)",
+        "_comment": "The other side (remote DIS application). Use 'port' for single-port mode, or 'send_port'/'receive_port' for dual-port mode.",
         "address": "239.1.2.4",
         "port": 3000,
         "interface": "0.0.0.0",
-        "receive_only_port": 0,
         "ttl": 32
     },
 
