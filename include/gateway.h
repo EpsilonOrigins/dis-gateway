@@ -63,8 +63,10 @@ private:
     void dump_stats() const;
 
     GatewayConfig config_;
-    MulticastSocket sock_a_;   // side A socket (bound to receive_port, sends to send_port)
-    MulticastSocket sock_b_;   // side B socket (bound to receive_port, sends to send_port)
+    MulticastSocket sock_a_send_;   // side A send socket (bound to send_port)
+    MulticastSocket sock_a_recv_;   // side A recv socket (bound to receive_port; unused in single-port mode)
+    MulticastSocket sock_b_send_;   // side B send socket (bound to send_port)
+    MulticastSocket sock_b_recv_;   // side B recv socket (bound to receive_port; unused in single-port mode)
     std::atomic<bool> running_{false};
     Stats stats_;
 };

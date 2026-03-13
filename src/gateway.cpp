@@ -39,20 +39,32 @@ Gateway::Gateway(GatewayConfig config)
     : config_(std::move(config)) {}
 
 void Gateway::run() {
-    // Each side gets one socket bound to receive_port (where we listen).
-    // send_port is only used as the destination port in sendto().
+    // Open sockets for a side based on port configuration:
+    //   same ports   → one socket on the shared port (send_sock handles both)
+    //   different    → send_sock on send_port, recv_sock on receive_port
     auto open_side = [](const SideConfig& cfg, const char* label,
-                        MulticastSocket& sock) -> bool {
-        if (!sock.open(cfg.address, cfg.receive_port, cfg.interface, cfg.ttl)) {
-            std::fprintf(stderr, "ERROR: Failed to open %s socket (%s:%u)\n",
-                         label, cfg.address.c_str(), cfg.receive_port);
-            return false;
-        }
-
+                        MulticastSocket& send_sock, MulticastSocket& recv_sock) -> bool {
         if (cfg.single_port()) {
+            // Single-port: one socket for both send and receive
+            if (!send_sock.open(cfg.address, cfg.send_port, cfg.interface, cfg.ttl)) {
+                std::fprintf(stderr, "ERROR: Failed to open %s socket (%s:%u)\n",
+                             label, cfg.address.c_str(), cfg.send_port);
+                return false;
+            }
             std::printf("%s: %s:%u (single port, iface %s)\n",
-                        label, cfg.address.c_str(), cfg.receive_port, cfg.interface.c_str());
+                        label, cfg.address.c_str(), cfg.send_port, cfg.interface.c_str());
         } else {
+            // Dual-port: sender on send_port, receiver on receive_port
+            if (!send_sock.open(cfg.address, cfg.send_port, cfg.interface, cfg.ttl)) {
+                std::fprintf(stderr, "ERROR: Failed to open %s send socket (%s:%u)\n",
+                             label, cfg.address.c_str(), cfg.send_port);
+                return false;
+            }
+            if (!recv_sock.open(cfg.address, cfg.receive_port, cfg.interface, cfg.ttl)) {
+                std::fprintf(stderr, "ERROR: Failed to open %s recv socket (%s:%u)\n",
+                             label, cfg.address.c_str(), cfg.receive_port);
+                return false;
+            }
             std::printf("%s: %s send:%u recv:%u (dual port, iface %s)\n",
                         label, cfg.address.c_str(), cfg.send_port, cfg.receive_port,
                         cfg.interface.c_str());
@@ -60,9 +72,9 @@ void Gateway::run() {
         return true;
     };
 
-    if (!open_side(config_.side_a, "Side A", sock_a_))
+    if (!open_side(config_.side_a, "Side A", sock_a_send_, sock_a_recv_))
         return;
-    if (!open_side(config_.side_b, "Side B", sock_b_))
+    if (!open_side(config_.side_b, "Side B", sock_b_send_, sock_b_recv_))
         return;
 
     std::printf("Rules: %zu a->b, %zu b->a\n",
@@ -74,10 +86,13 @@ void Gateway::run() {
     running_ = true;
     time_t last_stats = std::time(nullptr);
 
+    // Poll the receive fd for each side.
+    // Single-port: send socket is also the receiver.
+    // Dual-port: dedicated recv socket.
     struct pollfd pfds[2]{};
-    pfds[0].fd = sock_a_.fd();
+    pfds[0].fd = config_.side_a.single_port() ? sock_a_send_.fd() : sock_a_recv_.fd();
     pfds[0].events = POLLIN;
-    pfds[1].fd = sock_b_.fd();
+    pfds[1].fd = config_.side_b.single_port() ? sock_b_send_.fd() : sock_b_recv_.fd();
     pfds[1].events = POLLIN;
 
     uint8_t buf[MAX_PDU_SIZE];
@@ -92,24 +107,26 @@ void Gateway::run() {
 
         // Side A received → forward to side B
         if (pfds[0].revents & POLLIN) {
-            int n = sock_a_.recv(buf, sizeof(buf));
+            MulticastSocket& rsock = config_.side_a.single_port() ? sock_a_send_ : sock_a_recv_;
+            int n = rsock.recv(buf, sizeof(buf));
             if (n > 0) {
                 handle_pdu(buf, static_cast<size_t>(n),
                            config_.rules_a_to_b,
-                           sock_b_, config_.side_b.send_port,
-                           sock_a_, config_.side_a.send_port,
+                           sock_b_send_, config_.side_b.send_port,
+                           sock_a_send_, config_.side_a.send_port,
                            "A->B");
             }
         }
 
         // Side B received → forward to side A
         if (pfds[1].revents & POLLIN) {
-            int n = sock_b_.recv(buf, sizeof(buf));
+            MulticastSocket& rsock = config_.side_b.single_port() ? sock_b_send_ : sock_b_recv_;
+            int n = rsock.recv(buf, sizeof(buf));
             if (n > 0) {
                 handle_pdu(buf, static_cast<size_t>(n),
                            config_.rules_b_to_a,
-                           sock_a_, config_.side_a.send_port,
-                           sock_b_, config_.side_b.send_port,
+                           sock_a_send_, config_.side_a.send_port,
+                           sock_b_send_, config_.side_b.send_port,
                            "B->A");
             }
         }
